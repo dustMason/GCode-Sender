@@ -1,0 +1,67 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  /* font-family: Tahoma, Geneva, sans-serif; */
+  /* background: #fff; */
+  overflow: hidden;
+}
+
+a {
+  color: #00B7FF;
+}
+
+#work-area {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  right: 350px;
+  background: #666;
+}
+
+#work-area canvas,
+#svg {
+  position: absolute;
+  width: 600px;
+  height: 800px;
+  left: 50%;
+  top: 50%;
+  margin: -400px 0 0 -300px;
+  background: #fff;
+}
+
+#gcode {
+  position: absolute;
+  display: block;
+  margin: 0;
+  right: 0;
+  bottom: 0;
+  height: 200px;
+  width: 350px;
+  padding: 10px;
+  background: #333;
+  color: #777;
+  overflow: scroll;
+  font-size: 13px;
+}
+
+#controls {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 350px;
+  bottom: 200px;
+  background: #4b4d4e;
+  padding: 10px;
+}
+
+#controls select {
+  display: inline-block;
+  width: 160px;
+}
+
