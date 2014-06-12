@@ -46,6 +46,9 @@ io.on('connection', function(socket) {
     serial.pushCommand(command);
   });
 
+  socket.on("saveConfig", function(machineConfig) {
+    serial.saveConfig(machineConfig);
+  });
   serial.on("gotConfig", function(machineConfig) {
     io.emit("gotConfig", machineConfig);
   });
@@ -54,6 +57,7 @@ io.on('connection', function(socket) {
 
   socket.on('disconnect', function(){
     console.log('user disconnected');
+    serial.disconnect();
   });
 });
 
