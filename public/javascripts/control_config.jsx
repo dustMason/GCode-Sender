@@ -24,19 +24,41 @@ var ControlConfig = React.createClass({
   },
   render: function() {
     return (
-      <div>
-        <label>Machine Width</label>
-        <input type="text" name="machineWidth" value={this.state.machineWidth} onChange={this.handleChange} />
-        <label>Machine Height</label>
-        <input type="text" name="machineHeight" value={this.state.machineHeight} onChange={this.handleChange} />
-        <label>Paper Width</label>
-        <input type="text" name="paperWidth" value={this.state.paperWidth} onChange={this.handleChange} />
-        <label>Paper Height</label>
-        <input type="text" name="paperHeight" value={this.state.paperHeight} onChange={this.handleChange} />
-        <label>Left Spool Diameter</label>
-        <input type="text" name="leftSpoolDiameter" value={this.state.leftSpoolDiameter} onChange={this.handleChange} />
-        <label>Right Spool Diameter</label>
-        <input type="text" name="rightSpoolDiameter" value={this.state.rightSpoolDiameter} onChange={this.handleChange} />
+      <div className="controlConfig controlBlock cf">
+        <div className="machineBox">
+          <div className="machine-width">
+            <label className="tab">W</label>
+            <input type="text" name="machineWidth" value={this.state.machineWidth} onChange={this.handleChange} />
+          </div>
+          <div className="machine-height">
+            <label className="tab">H</label>
+            <input type="text" name="machineHeight" value={this.state.machineHeight} onChange={this.handleChange} />
+          </div>
+          <div className="paperBox">
+            <div className="paper-width">
+              <label className="tab">W</label>
+              <input type="text" name="paperWidth" value={this.state.paperWidth} onChange={this.handleChange} />
+            </div>
+            <div className="paper-height">
+              <label className="tab">H</label>
+              <input type="text" name="paperHeight" value={this.state.paperHeight} onChange={this.handleChange} />
+            </div>
+          </div>
+        </div>
+
+
+        <div class="diameterBox">
+          <p>Spool Diameters</p>
+          <div>
+            <label className="tab">L</label>
+            <input type="text" name="leftSpoolDiameter" value={this.state.leftSpoolDiameter} onChange={this.handleChange} />
+          </div>
+          <div>
+            <label className="tab">R</label>
+            <input type="text" name="rightSpoolDiameter" value={this.state.rightSpoolDiameter} onChange={this.handleChange} />
+          </div>
+        </div>
+
         <button onClick={this.saveConfig}>Save</button>
       </div>
     );

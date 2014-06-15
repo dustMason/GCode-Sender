@@ -24,40 +24,56 @@ app.get('/', function(req, res) {
   res.render('index');
 });
 
+var serial = new GcodeSerial();
+
 io.on('connection', function(socket) {
-  console.log('a user connected');
+  console.log('a user connected', socket.id);
+  
+  if (serial.machineIsConnected) {
+    // we're late to the party - machine is already connected
+    socket.emit("gotConfig", serial.machineConfig);
+    socket.emit("loadedGcodeFile", serial.currentGcodeFile);
+  }
 
-  var serial = new GcodeSerial();
-  socket.on("listPorts", function() {
-    serial.listPorts();
-  });
-  serial.on("listedPorts", function(ports) {
-    io.emit("listedPorts", ports);
-  });
+  var _events = {};
 
-  socket.on("connectToMachine", function(portName) {
-    serial.connect(portName);
-  });
-  serial.on("connected", function() {
-    io.emit("connected");
-  });
+  socket.on("listPorts", serial.listPorts);
+  _events.listedPorts = function(ports) {
+    socket.emit("listedPorts", ports);
+  };
+  serial.on("listedPorts", _events.listedPorts);
 
-  socket.on("pushCommand", function(command) {
-    serial.pushCommand(command);
-  });
+  socket.on("connectToMachine", serial.connect);
+  _events.connected = function() {
+    socket.emit("connected");
+  };
+  serial.on("connected", _events.connected);
 
-  socket.on("saveConfig", function(machineConfig) {
-    serial.saveConfig(machineConfig);
-  });
-  serial.on("gotConfig", function(machineConfig) {
-    io.emit("gotConfig", machineConfig);
-  });
+  socket.on("pushCommand", serial.pushCommand);
 
-  // fs.createReadStream(__dirname + '/../public/shaded_sphere.ngc').pipe(serial);
+  socket.on("saveConfig", serial.saveConfig);
+  _events.gotConfig = function(machineConfig) {
+    socket.emit("gotConfig", machineConfig);
+  };
+  serial.on("gotConfig", _events.gotConfig);
 
-  socket.on('disconnect', function(){
-    console.log('user disconnected');
-    serial.disconnect();
+  _events.sentCommand = function(command) {
+    socket.emit("sentCommand", command);
+  };
+  serial.on("sentCommand", _events.sentCommand);
+
+  socket.on("loadGcodeFile", serial.loadGcodeFile);
+  _events.loadedGcodeFile = function(fileContents) {
+    socket.emit("loadedGcodeFile", fileContents);
+  };
+  serial.on("loadedGcodeFile", _events.loadedGcodeFile);
+
+  socket.on('disconnect', function() {
+    for (var eventName in _events) {
+      serial.removeListener(eventName, _events[eventName]);
+      delete _events[eventName];
+    }
+    console.log('user disconnected', socket.id);
   });
 });
 

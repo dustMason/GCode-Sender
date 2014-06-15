@@ -1,32 +1,33 @@
 var SerialPort = require("serialport");
 var util = require("util");
 var async = require("async");
-var stream = require("stream");
+// var stream = require("stream");
 var events = require("events");
 
 var READY_CUE = "> ";
 
 function GcodeSerial() {
-  stream.Writable.call(this);
+  // stream.Writable.call(this);
   events.EventEmitter.call(this);
   this.commandOutputQueue = async.queue(this.sendCommand.bind(this), 1);
   this.commandOutputQueue.pause();
   this.currentResponse = "";
-  this.lastCommand = "";
   this.machineConfig = {};
+  this.machineIsConnected = false;
+  this.currentGcodeFile = "";
 }
 
-util.inherits(GcodeSerial, stream.Writable);
+// util.inherits(GcodeSerial, stream.Writable);
 util.inherits(GcodeSerial, events.EventEmitter);
 
-GcodeSerial.prototype._write = function(chunk, encoding, callback) {
-  var me = this;
-  var stringEncoding = (encoding === 'buffer') ? null : encoding;
-  chunk.toString(stringEncoding).split("\n").forEach(function(line) {
-    me.commandOutputQueue.push(line);
-  });
-  callback();
-};
+// GcodeSerial.prototype._write = function(chunk, encoding, callback) {
+//   var me = this;
+//   var stringEncoding = (encoding === 'buffer') ? null : encoding;
+//   chunk.toString(stringEncoding).split("\n").forEach(function(line) {
+//     me.commandOutputQueue.push(line);
+//   });
+//   callback();
+// };
 
 GcodeSerial.prototype.listPorts = function() {
   SerialPort.list(function (err, ports) {
@@ -46,6 +47,7 @@ GcodeSerial.prototype.connect = function(port) {
   this.serial.open(function(err) {
     if (err) { console.log(err); }
     this.emit("connected");
+    this.machineIsConnected = true;
     this.pushCommand("CONFIG");
   }.bind(this));
 };
@@ -56,26 +58,37 @@ GcodeSerial.prototype.disconnect = function() {
   }
 };
 
-GcodeSerial.prototype.pushCommand = function(command) {
-  this.commandOutputQueue.push(command);
+GcodeSerial.prototype.pushCommand = function(command, lineNumber) {
+  this.commandOutputQueue.push({command: command, line: lineNumber});
 };
 
-GcodeSerial.prototype.sendCommand = function(command, callback) {
+GcodeSerial.prototype.sendCommand = function(commandObject, callback) {
   var me = this;
-  this.serial.write(command + ";", function(err, results) {
+  this.serial.write(commandObject.command + ";", function(err, results) {
     if (err) { console.log(err); }
-    me.lastCommand = command;
     me.commandOutputQueue.pause();
-    me.serial.drain(callback);
+    me.serial.drain(function() {
+      me.emit("sentCommand", commandObject);
+      callback();
+    });
   });
 };
+
+GcodeSerial.prototype.loadGcodeFile = function(fileContents) {
+  var me = this;
+  this.currentGcodeFile = fileContents;
+  fileContents.split("\n").forEach(function(command, line) {
+    me.commandOutputQueue.push({command: command, line: line});
+  });
+};
+
 
 GcodeSerial.prototype.saveConfig = function(machineConfig) {
   var commandString = "CONFIG" +
     " W" + parseFloat(machineConfig.machineWidth).toFixed(3) +
     " H" + parseFloat(machineConfig.machineHeight).toFixed(3) +
-    " MR" + // motor one "name"
-    " NL" + // motor two "name"
+    " ML" + // motor one "name"
+    " NR" + // motor two "name"
     " O" + parseFloat(machineConfig.paperWidth).toFixed(3) +
     " P" + parseFloat(machineConfig.paperHeight).toFixed(3) +
     " Q" + parseFloat(machineConfig.leftSpoolDiameter).toFixed(3) +
@@ -108,13 +121,7 @@ GcodeSerial.prototype._parseResponse = function(response, callback) {
     callback(null);
     // this._loadRate(response, callback);
   } else if (response.indexOf("WHERE:")) {
-    console.log("WHERE Not implemented!");
-    callback(null);
-    // this._loadWhere(response, callback);
-  } else if (response.indexOf("DIAMETER:")) {
-    console.log("DIAMETER Not implemented!");
-    callback(null);
-    // this._loadDiameter(response, callback);
+    this._loadWhere(response, callback);
   } else {
     callback(null);
   }
@@ -125,7 +132,7 @@ GcodeSerial.prototype._loadConfig = function(configString, callback) {
   var lines = configString.split(":")[1].split("\n");
   lines.forEach(function(line) {
     var value = parseFloat(line.split("=")[1]);
-    // TODO handle motor "names"
+    // TODO handle motor "names". from arduino src:
     // case 'M': _m1d=*(ptr+1); break;
     // case 'N': _m2d=*(ptr+1); break;
     if (line.indexOf("W") === 0) {
@@ -144,6 +151,25 @@ GcodeSerial.prototype._loadConfig = function(configString, callback) {
   });
   this.machineConfig = config;
   this.emit("gotConfig", config);
+  callback(null);
+};
+
+GcodeSerial.prototype._loadWhere = function(whereString, callback) {
+  var where = {};
+  // WHERE:X0.00 Y0.00 Z0.00\n
+  var parts = whereString.split(":")[1].split(" ");
+  parts.forEach(function(part) {
+    var value = parseFloat(part.substr(1));
+    if (part.indexOf("X") === 0) {
+      where.x = value;
+    } else if (part.indexOf("Y") === 0) {
+      where.y = value;
+    } else if (part.indexOf("Z") === 0) {
+      where.z = value;
+    }
+  });
+  this.where = where;
+  this.emit("gotWhere", where);
   callback(null);
 };
 

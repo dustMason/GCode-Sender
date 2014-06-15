@@ -30,7 +30,7 @@ var ControlPort = React.createClass({
   },
   render: function() {
     return (
-      <div>
+      <div className="controlPort controlBlock">
         <label>Port</label>
         <select onChange={this.handlePortSelectChange} value={this.state.currentPortName}>{this.state.portListOptions}</select>
         <button onClick={this.handleConnectButtonClick}>Connect</button>
