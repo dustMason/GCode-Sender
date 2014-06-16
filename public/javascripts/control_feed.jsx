@@ -9,7 +9,7 @@ var CommandLog = React.createClass({
     var logItems = this.props.data.map(function(item) {
       return <li>{item}</li>;
     });
-    return <div className="log"><ol>{logItems}</ol></div>;
+    return <div className="log"><ul>{logItems}</ul></div>;
   }
 });
 
@@ -18,8 +18,7 @@ var ControlFeed = React.createClass({
     return {logItems:[]};
   },
   handleSentCommand: function(commandObject) {
-    var command = commandObject.command;
-    console.log(commandObject);
+    var command = commandObject.line + ". " + commandObject.command;
     var newItems = this.state.logItems.concat([command]);
     this.setState({logItems: newItems});
   },
@@ -34,10 +33,17 @@ var ControlFeed = React.createClass({
     })(file);
     reader.readAsText(file);
   },
+  handleGoClick: function(e) {
+    socket.emit("resumeQueue");
+  },
+  handlePauseClick: function(e) {
+    socket.emit("pauseQueue");
+  },
   render: function() {
     return (
       <div>
-        <button value="">Pause</button>
+        <button value="" onClick={this.handleGoClick}>Go</button>
+        <button value="" onClick={this.handlePauseClick}>P</button>
         <button value="">Skip To</button>
         <input type="text" name="skipToLineNumber" />
         <input type="file" name="gcodeFile" onChange={this.handleGcodeFile} />

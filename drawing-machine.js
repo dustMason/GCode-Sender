@@ -1,13 +1,11 @@
 var SerialPort = require("serialport");
 var util = require("util");
 var async = require("async");
-// var stream = require("stream");
 var events = require("events");
 
 var READY_CUE = "> ";
 
-function GcodeSerial() {
-  // stream.Writable.call(this);
+function Machine() {
   events.EventEmitter.call(this);
   this.commandOutputQueue = async.queue(this.sendCommand.bind(this), 1);
   this.commandOutputQueue.pause();
@@ -15,21 +13,12 @@ function GcodeSerial() {
   this.machineConfig = {};
   this.machineIsConnected = false;
   this.currentGcodeFile = "";
+  this.currentLineNumber = 0;
 }
 
-// util.inherits(GcodeSerial, stream.Writable);
-util.inherits(GcodeSerial, events.EventEmitter);
+util.inherits(Machine, events.EventEmitter);
 
-// GcodeSerial.prototype._write = function(chunk, encoding, callback) {
-//   var me = this;
-//   var stringEncoding = (encoding === 'buffer') ? null : encoding;
-//   chunk.toString(stringEncoding).split("\n").forEach(function(line) {
-//     me.commandOutputQueue.push(line);
-//   });
-//   callback();
-// };
-
-GcodeSerial.prototype.listPorts = function() {
+Machine.prototype.listPorts = function() {
   SerialPort.list(function (err, ports) {
     if (err) { console.log(err); }
     ports = ports.map(function(port){ return port.comName; });
@@ -41,7 +30,7 @@ GcodeSerial.prototype.listPorts = function() {
   }.bind(this));
 };
 
-GcodeSerial.prototype.connect = function(port) {
+Machine.prototype.connect = function(port) {
   this.serial = new SerialPort.SerialPort(port, {baudrate: 57600}, false); // false == do not open immediately
   this.serial.on('data', this._handleSerialData.bind(this));
   this.serial.open(function(err) {
@@ -52,38 +41,49 @@ GcodeSerial.prototype.connect = function(port) {
   }.bind(this));
 };
 
-GcodeSerial.prototype.disconnect = function() {
+Machine.prototype.disconnect = function() {
   if (this.serial) {
     this.serial.close();
   }
 };
 
-GcodeSerial.prototype.pushCommand = function(command, lineNumber) {
+Machine.prototype.pushCommand = function(command, lineNumber) {
   this.commandOutputQueue.push({command: command, line: lineNumber});
 };
 
-GcodeSerial.prototype.sendCommand = function(commandObject, callback) {
+Machine.prototype.sendCommand = function(commandObject, callback) {
   var me = this;
   this.serial.write(commandObject.command + ";", function(err, results) {
     if (err) { console.log(err); }
     me.commandOutputQueue.pause();
     me.serial.drain(function() {
       me.emit("sentCommand", commandObject);
+      if (commandObject.line) {
+        me.currentLineNumber = commandObject.line;
+      }
       callback();
     });
   });
 };
 
-GcodeSerial.prototype.loadGcodeFile = function(fileContents) {
+Machine.prototype.pauseQueue = function() {
+  this.commandOutputQueue.pause();
+};
+Machine.prototype.resumeQueue = function() {
+  this.commandOutputQueue.resume();
+};
+
+Machine.prototype.loadGcodeFile = function(fileContents) {
   var me = this;
   this.currentGcodeFile = fileContents;
+  this.currentLineNumber = 0;
   fileContents.split("\n").forEach(function(command, line) {
     me.commandOutputQueue.push({command: command, line: line});
   });
+  this.emit("loadedGcodeFile", fileContents);
 };
 
-
-GcodeSerial.prototype.saveConfig = function(machineConfig) {
+Machine.prototype.saveConfig = function(machineConfig) {
   var commandString = "CONFIG" +
     " W" + parseFloat(machineConfig.machineWidth).toFixed(3) +
     " H" + parseFloat(machineConfig.machineHeight).toFixed(3) +
@@ -97,7 +97,7 @@ GcodeSerial.prototype.saveConfig = function(machineConfig) {
   this.pushCommand(commandString);
 };
 
-GcodeSerial.prototype._handleSerialData = function(data) {
+Machine.prototype._handleSerialData = function(data) {
   console.log(data.toString());
   this.currentResponse += data.toString();
   if (this.currentResponse.indexOf(READY_CUE) > -1) {
@@ -113,7 +113,7 @@ GcodeSerial.prototype._handleSerialData = function(data) {
   }
 };
 
-GcodeSerial.prototype._parseResponse = function(response, callback) {
+Machine.prototype._parseResponse = function(response, callback) {
   if (response.indexOf("CONFIG:") > -1) {
     this._loadConfig(response, callback);
   } else if (response.indexOf("RATE:")) {
@@ -127,7 +127,7 @@ GcodeSerial.prototype._parseResponse = function(response, callback) {
   }
 };
 
-GcodeSerial.prototype._loadConfig = function(configString, callback) {
+Machine.prototype._loadConfig = function(configString, callback) {
   var config = {};
   var lines = configString.split(":")[1].split("\n");
   lines.forEach(function(line) {
@@ -154,7 +154,7 @@ GcodeSerial.prototype._loadConfig = function(configString, callback) {
   callback(null);
 };
 
-GcodeSerial.prototype._loadWhere = function(whereString, callback) {
+Machine.prototype._loadWhere = function(whereString, callback) {
   var where = {};
   // WHERE:X0.00 Y0.00 Z0.00\n
   var parts = whereString.split(":")[1].split(" ");
@@ -173,4 +173,4 @@ GcodeSerial.prototype._loadWhere = function(whereString, callback) {
   callback(null);
 };
 
-module.exports = GcodeSerial;
+module.exports = Machine;

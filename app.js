@@ -4,7 +4,7 @@ var favicon = require('static-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-var GcodeSerial = require("./gcode_serial.js");
+var DrawingMachine = require("./drawing-machine.js");
 
 var app = express();
 var http = require('http').Server(app);
@@ -24,56 +24,59 @@ app.get('/', function(req, res) {
   res.render('index');
 });
 
-var serial = new GcodeSerial();
+var machine = new DrawingMachine();
 
 io.on('connection', function(socket) {
-  console.log('a user connected', socket.id);
-  
-  if (serial.machineIsConnected) {
+  console.log('User connected', socket.id);
+
+  if (machine.machineIsConnected) {
     // we're late to the party - machine is already connected
-    socket.emit("gotConfig", serial.machineConfig);
-    socket.emit("loadedGcodeFile", serial.currentGcodeFile);
+    socket.emit("gotConfig", machine.machineConfig);
+    socket.emit("loadedGcodeFile", machine.currentGcodeFile, machine.currentLineNumber);
   }
 
   var _events = {};
 
-  socket.on("listPorts", serial.listPorts);
+  socket.on("listPorts", machine.listPorts.bind(machine));
   _events.listedPorts = function(ports) {
     socket.emit("listedPorts", ports);
   };
-  serial.on("listedPorts", _events.listedPorts);
+  machine.on("listedPorts", _events.listedPorts);
 
-  socket.on("connectToMachine", serial.connect);
+  socket.on("connectToMachine", machine.connect.bind(machine));
   _events.connected = function() {
     socket.emit("connected");
   };
-  serial.on("connected", _events.connected);
+  machine.on("connected", _events.connected);
 
-  socket.on("pushCommand", serial.pushCommand);
+  socket.on("pushCommand", machine.pushCommand.bind(machine));
 
-  socket.on("saveConfig", serial.saveConfig);
+  socket.on("saveConfig", machine.saveConfig.bind(machine));
   _events.gotConfig = function(machineConfig) {
     socket.emit("gotConfig", machineConfig);
   };
-  serial.on("gotConfig", _events.gotConfig);
+  machine.on("gotConfig", _events.gotConfig);
 
   _events.sentCommand = function(command) {
     socket.emit("sentCommand", command);
   };
-  serial.on("sentCommand", _events.sentCommand);
+  machine.on("sentCommand", _events.sentCommand);
 
-  socket.on("loadGcodeFile", serial.loadGcodeFile);
+  socket.on("loadGcodeFile", machine.loadGcodeFile.bind(machine));
   _events.loadedGcodeFile = function(fileContents) {
     socket.emit("loadedGcodeFile", fileContents);
   };
-  serial.on("loadedGcodeFile", _events.loadedGcodeFile);
+  machine.on("loadedGcodeFile", _events.loadedGcodeFile);
+
+  socket.on("pauseQueue", machine.pauseQueue.bind(machine));
+  socket.on("resumeQueue", machine.resumeQueue.bind(machine));
 
   socket.on('disconnect', function() {
     for (var eventName in _events) {
-      serial.removeListener(eventName, _events[eventName]);
+      machine.removeListener(eventName, _events[eventName]);
       delete _events[eventName];
     }
-    console.log('user disconnected', socket.id);
+    console.log('User disconnected', socket.id);
   });
 });
 
