@@ -31,45 +31,43 @@ io.on('connection', function(socket) {
 
   if (machine.machineIsConnected) {
     // we're late to the party - machine is already connected
+    socket.emit("connected");
+    socket.emit("listedPorts", machine.portList);
     socket.emit("gotConfig", machine.machineConfig);
     socket.emit("loadedGcodeFile", machine.currentGcodeFile, machine.currentLineNumber);
   }
 
+  if (machine.isDrawing()) {
+    // let the front end know to adjust controls
+    socket.emit("startedDrawing");
+  }
+
   var _events = {};
+  [
+    "listedPorts",
+    "connected",
+    "disconnected",
+    "gotConfig",
+    "sentCommand",
+    "loadedGcodeFile",
+    "pausedDrawing",
+    "startedDrawing"
+  ].forEach(function(eventName) {
+    _events[eventName] = function(arg) {
+      socket.emit(eventName, arg);
+    };
+    machine.on(eventName, _events[eventName]);
+  });
 
   socket.on("listPorts", machine.listPorts.bind(machine));
-  _events.listedPorts = function(ports) {
-    socket.emit("listedPorts", ports);
-  };
-  machine.on("listedPorts", _events.listedPorts);
-
   socket.on("connectToMachine", machine.connect.bind(machine));
-  _events.connected = function() {
-    socket.emit("connected");
-  };
-  machine.on("connected", _events.connected);
-
+  socket.on("disconnectFromMachine", machine.disconnect.bind(machine));
   socket.on("pushCommand", machine.pushCommand.bind(machine));
-
   socket.on("saveConfig", machine.saveConfig.bind(machine));
-  _events.gotConfig = function(machineConfig) {
-    socket.emit("gotConfig", machineConfig);
-  };
-  machine.on("gotConfig", _events.gotConfig);
-
-  _events.sentCommand = function(command) {
-    socket.emit("sentCommand", command);
-  };
-  machine.on("sentCommand", _events.sentCommand);
-
   socket.on("loadGcodeFile", machine.loadGcodeFile.bind(machine));
-  _events.loadedGcodeFile = function(fileContents) {
-    socket.emit("loadedGcodeFile", fileContents);
-  };
-  machine.on("loadedGcodeFile", _events.loadedGcodeFile);
-
-  socket.on("pauseQueue", machine.pauseQueue.bind(machine));
-  socket.on("resumeQueue", machine.resumeQueue.bind(machine));
+  socket.on("pauseDrawing", machine.pauseDrawing.bind(machine));
+  socket.on("resumeDrawing", machine.resumeDrawing.bind(machine));
+  socket.on("startDrawing", machine.startDrawing.bind(machine));
 
   socket.on('disconnect', function() {
     for (var eventName in _events) {

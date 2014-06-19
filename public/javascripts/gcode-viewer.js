@@ -1,8 +1,4 @@
 function GcodeViewer() {
-  this.lines = [];
-  this.lastPoint = { x:0, y:0, z:0, drawing:false };
-  this.relative = false;
-  this.drawingGroup = new paper.Group();
   this.unfinishedLineColor = new paper.Color(0.2);
   this.finishedLineColor = new paper.Color(1,0,0);
 }
@@ -37,6 +33,11 @@ GcodeViewer.prototype.renderPaper = function(width, height) {
 
 GcodeViewer.prototype.renderDrawing = function(gcode, alreadyFinishedUpToLineNumber) {
   var me = this;
+  me.gcode = gcode;
+  me.drawingGroup = new paper.Group();
+  me.lines = [];
+  me.lastPoint = { x:0, y:0, z:0, drawing:false };
+  me.relative = false;
 
   var parser = new GCodeParser({
     G1: function(args, line) {
@@ -67,7 +68,7 @@ GcodeViewer.prototype.renderDrawing = function(gcode, alreadyFinishedUpToLineNum
     },
 
     'default': function(args, info) {
-      console.error('Unknown command:', args.cmd, args, info);
+      console.log('Unknown command:', args.cmd, args, info);
     },
   });
 
@@ -76,6 +77,10 @@ GcodeViewer.prototype.renderDrawing = function(gcode, alreadyFinishedUpToLineNum
   me.drawingGroup.bringToFront();
   paper.view.draw();
 
+};
+
+GcodeViewer.prototype.clear = function() {
+  // paper.project.activeLayer.removeChildren();
 };
 
 GcodeViewer.prototype._absolute = function(v1, v2) {

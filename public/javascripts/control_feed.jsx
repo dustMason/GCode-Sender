@@ -7,7 +7,10 @@ var CommandLog = React.createClass({
   },
   render: function() {
     var logItems = this.props.data.map(function(item) {
-      return <li>{item}</li>;
+      var itemContents = "";
+      if (item.line) { itemContents += item.line + ". " }
+      if (item.command) { itemContents += item.command }
+      return <li>{itemContents}</li>;
     });
     return <div className="log"><ul>{logItems}</ul></div>;
   }
@@ -15,11 +18,13 @@ var CommandLog = React.createClass({
 
 var ControlFeed = React.createClass({
   getInitialState: function() {
-    return {logItems:[]};
+    return {
+      logItems:[],
+      drawing: false
+    };
   },
   handleSentCommand: function(commandObject) {
-    var command = commandObject.line + ". " + commandObject.command;
-    var newItems = this.state.logItems.concat([command]);
+    var newItems = this.state.logItems.concat([commandObject]);
     this.setState({logItems: newItems});
   },
   handleGcodeFile: function(event) {
@@ -33,20 +38,31 @@ var ControlFeed = React.createClass({
     })(file);
     reader.readAsText(file);
   },
-  handleGoClick: function(e) {
-    socket.emit("resumeQueue");
+  handleStartedDrawing: function() {
+    this.setState({drawing: true});
+  },
+  handlePausedDrawing: function() {
+    this.setState({drawing: false});
+  },
+  handleStartClick: function(e) {
+    socket.emit("startDrawing");
   },
   handlePauseClick: function(e) {
-    socket.emit("pauseQueue");
+    socket.emit("pauseDrawing");
   },
   render: function() {
+    var initControls = <div>
+      <button value="" onClick={this.handleStartClick}>Start</button>
+      <input type="text" name="skipToLineNumber" />
+      <button value="">Skip To</button>
+      <input type="file" name="gcodeFile" onChange={this.handleGcodeFile} />
+    </div>
+    var inProgressControls = <div>
+      <button value="" onClick={this.handlePauseClick}>Pause</button>
+    </div>
     return (
       <div>
-        <button value="" onClick={this.handleGoClick}>Go</button>
-        <button value="" onClick={this.handlePauseClick}>P</button>
-        <button value="">Skip To</button>
-        <input type="text" name="skipToLineNumber" />
-        <input type="file" name="gcodeFile" onChange={this.handleGcodeFile} />
+        {this.state.drawing ? inProgressControls : initControls}
         <CommandLog data={this.state.logItems} />
       </div>
     );
@@ -55,3 +71,5 @@ var ControlFeed = React.createClass({
 
 var controlFeed = React.renderComponent(<ControlFeed/>, document.getElementById('controlFeed'));
 socket.on("sentCommand", controlFeed.handleSentCommand);
+socket.on("startedDrawing", controlFeed.handleStartedDrawing);
+socket.on("pausedDrawing", controlFeed.handlePausedDrawing);

@@ -8,7 +8,9 @@ var ControlConfig = React.createClass({
       paperWidth: 0,
       paperHeight: 0,
       leftSpoolDiameter: 0,
-      rightSpoolDiameter: 0
+      rightSpoolDiameter: 0,
+      penUpAngle: 0,
+      penDownAngle: 0
     };
   },
   loadConfig: function(machineConfig) {
@@ -46,7 +48,6 @@ var ControlConfig = React.createClass({
           </div>
         </div>
 
-
         <div class="diameterBox">
           <p>Spool Diameters</p>
           <div>
@@ -56,6 +57,18 @@ var ControlConfig = React.createClass({
           <div>
             <label className="tab">R</label>
             <input type="text" name="rightSpoolDiameter" value={this.state.rightSpoolDiameter} onChange={this.handleChange} />
+          </div>
+        </div>
+
+        <div class="penAngleBox">
+          <p>Pen Angle</p>
+          <div>
+            <label className="tab">U</label>
+            <input type="text" name="penUpAngle" value={this.state.penUpAngle} onChange={this.handleChange} />
+          </div>
+          <div>
+            <label className="tab">D</label>
+            <input type="text" name="penDownAngle" value={this.state.penDownAngle} onChange={this.handleChange} />
           </div>
         </div>
 

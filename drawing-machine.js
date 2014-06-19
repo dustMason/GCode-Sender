@@ -9,11 +9,15 @@ function Machine() {
   events.EventEmitter.call(this);
   this.commandOutputQueue = async.queue(this.sendCommand.bind(this), 1);
   this.commandOutputQueue.pause();
+  this.drawingOutputQueue = async.queue(this.sendCommand.bind(this), 1);
+  this.drawingOutputQueue.pause();
   this.currentResponse = "";
   this.machineConfig = {};
   this.machineIsConnected = false;
+  this.activeQueue = this.commandOutputQueue;
   this.currentGcodeFile = "";
   this.currentLineNumber = 0;
+  this.portList = [];
 }
 
 util.inherits(Machine, events.EventEmitter);
@@ -26,6 +30,7 @@ Machine.prototype.listPorts = function() {
     ports = ports.sort(function(a, b) {
       return b.indexOf("usbserial") - a.indexOf("usbserial");
     });
+    this.portList = ports;
     this.emit("listedPorts", ports);
   }.bind(this));
 };
@@ -44,6 +49,7 @@ Machine.prototype.connect = function(port) {
 Machine.prototype.disconnect = function() {
   if (this.serial) {
     this.serial.close();
+    this.emit("disconnected");
   }
 };
 
@@ -53,9 +59,10 @@ Machine.prototype.pushCommand = function(command, lineNumber) {
 
 Machine.prototype.sendCommand = function(commandObject, callback) {
   var me = this;
+  console.log("=====>", commandObject);
   this.serial.write(commandObject.command + ";", function(err, results) {
     if (err) { console.log(err); }
-    me.commandOutputQueue.pause();
+    me.activeQueue.pause();
     me.serial.drain(function() {
       me.emit("sentCommand", commandObject);
       if (commandObject.line) {
@@ -66,21 +73,38 @@ Machine.prototype.sendCommand = function(commandObject, callback) {
   });
 };
 
-Machine.prototype.pauseQueue = function() {
-  this.commandOutputQueue.pause();
-};
-Machine.prototype.resumeQueue = function() {
-  this.commandOutputQueue.resume();
-};
-
 Machine.prototype.loadGcodeFile = function(fileContents) {
   var me = this;
   this.currentGcodeFile = fileContents;
-  this.currentLineNumber = 0;
-  fileContents.split("\n").forEach(function(command, line) {
-    me.commandOutputQueue.push({command: command, line: line});
-  });
   this.emit("loadedGcodeFile", fileContents);
+};
+
+Machine.prototype.startDrawing = function() {
+  this.currentLineNumber = 0;
+  this.drawingOutputQueue.pause();
+  this.commandOutputQueue.pause();
+  this.currentGcodeFile.split("\n").forEach(function(command, line) {
+    this.drawingOutputQueue.push({command: command, line: line});
+  }.bind(this));
+  this.activeQueue = this.drawingOutputQueue;
+  this.drawingOutputQueue.resume();
+  this.emit("startedDrawing");
+};
+Machine.prototype.resumeDrawing = function() {
+  this.commandOutputQueue.pause();
+  this.activeQueue = this.drawingOutputQueue;
+  this.drawingOutputQueue.resume();
+  this.emit("startedDrawing");
+};
+Machine.prototype.pauseDrawing = function() {
+  this.drawingOutputQueue.pause();
+  this.activeQueue = this.commandOutputQueue;
+  this.commandOutputQueue.resume();
+  this.emit("pausedDrawing");
+};
+
+Machine.prototype.isDrawing = function() {
+  return !this.drawingOutputQueue.paused;
 };
 
 Machine.prototype.saveConfig = function(machineConfig) {
@@ -103,12 +127,9 @@ Machine.prototype._handleSerialData = function(data) {
   if (this.currentResponse.indexOf(READY_CUE) > -1) {
     this.currentResponse = this.currentResponse.split(READY_CUE)[0];
     this._parseResponse(this.currentResponse, function(err) {
-      if (err) {
-        console.log(err);
-      }
-      this.commandOutputQueue.resume();
+      if (err) { console.log(err); }
+      this.activeQueue.resume();
     }.bind(this));
-    // not totally sure if this creates or avoids a race condition...
     this.currentResponse = "";
   }
 };
@@ -116,11 +137,11 @@ Machine.prototype._handleSerialData = function(data) {
 Machine.prototype._parseResponse = function(response, callback) {
   if (response.indexOf("CONFIG:") > -1) {
     this._loadConfig(response, callback);
-  } else if (response.indexOf("RATE:")) {
+  } else if (response.indexOf("RATE:") > -1) {
     console.log("RATE Not implemented!");
     callback(null);
     // this._loadRate(response, callback);
-  } else if (response.indexOf("WHERE:")) {
+  } else if (response.indexOf("WHERE:") > -1) {
     this._loadWhere(response, callback);
   } else {
     callback(null);
@@ -130,6 +151,7 @@ Machine.prototype._parseResponse = function(response, callback) {
 Machine.prototype._loadConfig = function(configString, callback) {
   var config = {};
   var lines = configString.split(":")[1].split("\n");
+  console.log("loading config", configString);
   lines.forEach(function(line) {
     var value = parseFloat(line.split("=")[1]);
     // TODO handle motor "names". from arduino src:

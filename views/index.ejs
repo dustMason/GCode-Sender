@@ -26,6 +26,7 @@
       });
 
       socket.on("gotConfig", function(config) {
+        console.log("got got config");
         viewer.renderPaper(config.paperWidth * 10, config.paperHeight * 10);
       });
 
@@ -37,6 +38,10 @@
         if (commandObject.line) {
           viewer.changeLineColor(commandObject.line, this.finishedLineColor);
         }
+      });
+
+      socket.on("disconnected", function() {
+        viewer.clear();
       });
     </script>
   </head>
