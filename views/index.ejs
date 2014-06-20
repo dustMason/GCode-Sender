@@ -26,8 +26,8 @@
       });
 
       socket.on("gotConfig", function(config) {
-        console.log("got got config");
         viewer.renderPaper(config.paperWidth * 10, config.paperHeight * 10);
+        viewer.setPenAngles(config.penUpAngle, config.penDownAngle); // better be ints!
       });
 
       socket.on("loadedGcodeFile", function(gcodeFileContents, alreadyFinishedUpToLineNumber) {

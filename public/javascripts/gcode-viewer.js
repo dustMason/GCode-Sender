@@ -1,6 +1,8 @@
 function GcodeViewer() {
   this.unfinishedLineColor = new paper.Color(0.2);
   this.finishedLineColor = new paper.Color(1,0,0);
+  this.penUpAngle = 90;
+  this.penDownAngle = 0;
 }
 
 GcodeViewer.prototype.addSegment = function(fromPoint, toPoint, lineNumber, color) {
@@ -31,6 +33,18 @@ GcodeViewer.prototype.renderPaper = function(width, height) {
   paper.view.draw();
 };
 
+GcodeViewer.prototype.setPenAngles = function(upAngle, downAngle) {
+  this.penUpAngle = upAngle;
+  this.penDownAngle = downAngle;
+  if (this.gcode !== "") {
+    // TODO passing a zero here is wrong! need to rework the alreadyFinishedUpToLineNumber
+    // mechanism to store the drawing progress locally in this class? or better yet store
+    // the z value in the line object itself. when pen angles change, alter the existing
+    // lines to fix instead of performing a re-render.
+    this.renderDrawing(this.gcode, 0);
+  }
+};
+
 GcodeViewer.prototype.renderDrawing = function(gcode, alreadyFinishedUpToLineNumber) {
   var me = this;
   me.gcode = gcode;
@@ -48,7 +62,7 @@ GcodeViewer.prototype.renderDrawing = function(gcode, alreadyFinishedUpToLineNum
         y: args.y !== undefined ? me._absolute(me.lastPoint.y, args.y) : me.lastPoint.y,
         z: args.z !== undefined ? me._absolute(me.lastPoint.z, args.z) : me.lastPoint.z
       };
-      if (newPoint.z !== undefined && newPoint.z === 0) {
+      if (newPoint.z !== undefined && newPoint.z === me.penUpAngle) {
         newPoint.drawing = false;
       } else {
         newPoint.drawing = true;
