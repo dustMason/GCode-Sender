@@ -81,7 +81,7 @@ var ControlConfig = React.createClass({
         <div className="stepStyleBox">
           <p>Step Style</p>
           <div>
-            <select id="stepStyle" name="stepStyle" value={this.state.stepStyle}>
+            <select id="stepStyle" name="stepStyle" value={this.state.stepStyle} onChange={this.handleChange}>
               <option value="1">Single</option>
               <option value="2">Double</option>
               <option value="3">Interleave</option>

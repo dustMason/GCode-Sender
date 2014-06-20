@@ -36,7 +36,7 @@ GcodeViewer.prototype.renderPaper = function(width, height) {
 GcodeViewer.prototype.setPenAngles = function(upAngle, downAngle) {
   this.penUpAngle = upAngle;
   this.penDownAngle = downAngle;
-  if (this.gcode !== "") {
+  if (this.gcode && this.gcode !== "") {
     // TODO passing a zero here is wrong! need to rework the alreadyFinishedUpToLineNumber
     // mechanism to store the drawing progress locally in this class? or better yet store
     // the z value in the line object itself. when pen angles change, alter the existing
