@@ -82,35 +82,35 @@ Adafruit_StepperMotor *m2;
 
 static Servo s1;
 
-static int STEP_STYLE = INTERLEAVE;
+static int STEP_STYLE;
 // attention: these get set by adjustStepStyle below
-static int MAX_STEPS_S = 1;
-static float MAX_VEL = 1; // cm/s
-static int STEPS_PER_TURN = 1;
+static int MAX_STEPS_S;
+static float MAX_VEL; // cm/s
+static int STEPS_PER_TURN;
 
 // config values. used to calculate limits below
-static float MACHINE_WIDTH = 0;
-static float MACHINE_HEIGHT = 0;
-static float PAPER_WIDTH = 0;
-static float PAPER_HEIGHT = 0;
+static float MACHINE_WIDTH;
+static float MACHINE_HEIGHT;
+static float PAPER_WIDTH;
+static float PAPER_HEIGHT;
 
 // servo angles for pen control
 // attention: these are set by EEPROM config
-static int PEN_UP_ANGLE = 1;
-static int PEN_DOWN_ANGLE = 1; // Some steppers don't like 0 degrees
-static int PEN_DELAY = 1; // in ms (250 is good)
+static int PEN_UP_ANGLE;
+static int PEN_DOWN_ANGLE; // Some steppers don't like 0 degrees
+static int PEN_DELAY; // in ms (250 is good)
 
 // plotter limits
 // all distances are relative to the calibration point of the plotter.
 // (normally this is the center of the drawing area)
-static float limit_top = 0;  // distance to top of drawing area.
-static float limit_bottom = 0;  // Distance to bottom of drawing area.
-static float limit_right = 0;  // Distance to right of drawing area.
-static float limit_left = 0;  // Distance to left of drawing area.
+static float limit_top;  // distance to top of drawing area.
+static float limit_bottom;  // Distance to bottom of drawing area.
+static float limit_right;  // Distance to right of drawing area.
+static float limit_left;  // Distance to left of drawing area.
 
 // what are the motors called?
-char m1d='L';
-char m2d='R';
+char m1d = 'L';
+char m2d = 'R';
 
 // which way are the spools wound, relative to motor movement?
 int M1_REEL_IN  = FORWARD;
@@ -120,11 +120,11 @@ int M2_REEL_OUT = FORWARD;
 
 // calculate some numbers to help us find feed_rate
 // attention: these are set by adjustSpoolDiameter below
-float SPOOL_DIAMETER1 = 4.300;
-float SPOOL_DIAMETER2 = 4.300;
+float SPOOL_DIAMETER1;
+float SPOOL_DIAMETER2;
 
-float THREADPERSTEP1 = 0.675; // thread per step
-float THREADPERSTEP2 = 0.675; // thread per step
+float THREADPERSTEP1; // thread per step
+float THREADPERSTEP2; // thread per step
 
 // plotter position.
 static float posx, velx;
@@ -149,19 +149,19 @@ static float dt; // since last tick
 static char buffer[MAX_BUF]; // Serial buffer
 static int sofar; // Serial buffer progress
 
-// calculate max velocity, threadperstep.
-static void adjustSpoolDiameter(float diameter1,float diameter2) {
+static void adjustSpoolDiameter(float diameter1, float diameter2) {
   SPOOL_DIAMETER1 = diameter1;
-  float SPOOL_CIRC = SPOOL_DIAMETER1*PI; // circumference
-  THREADPERSTEP1 = SPOOL_CIRC/STEPS_PER_TURN; // thread per step
+  float SPOOL_CIRC = SPOOL_DIAMETER1 * PI;
+  THREADPERSTEP1 = SPOOL_CIRC / STEPS_PER_TURN;
 
   SPOOL_DIAMETER2 = diameter2;
-  SPOOL_CIRC = SPOOL_DIAMETER2*PI; // circumference
-  THREADPERSTEP2 = SPOOL_CIRC/STEPS_PER_TURN; // thread per step
+  SPOOL_CIRC = SPOOL_DIAMETER2 * PI;
+  THREADPERSTEP2 = SPOOL_CIRC / STEPS_PER_TURN;
 
   float MAX_VEL1 = MAX_STEPS_S * THREADPERSTEP1; // cm/s
   float MAX_VEL2 = MAX_STEPS_S * THREADPERSTEP2; // cm/s
   MAX_VEL = MAX_VEL1 > MAX_VEL2 ? MAX_VEL1 : MAX_VEL2;
+  setFeedRate(MAX_VEL * 30 / mode_scale); // *30 because i also /2
 }
 
 static void adjustMachineLimits(float machineWidth, float machineHeight) {
@@ -181,11 +181,11 @@ static void adjustStepStyle(int style) {
   // NEMA17 are rated up to 3000RPM.  Adafruit can handle >1000RPM.
   // These numbers directly affect the maximum velocity.
   if (style == MICROSTEP) {
-    STEPS_PER_TURN = 3200.0;
+    STEPS_PER_TURN = 3200;
   } else if (style == INTERLEAVE) {
-    STEPS_PER_TURN = 400.0;
+    STEPS_PER_TURN = 400;
   } else {
-    STEPS_PER_TURN = 200.0;
+    STEPS_PER_TURN = 200;
   }
   MAX_STEPS_S = STEPS_PER_TURN * MAX_RPM / 60.0; // steps/s
   // MAX_VEL = MAX_STEPS_S * THREADPERSTEP1; // cm/s // gets set again by adjustSpoolDiameter anyway...
@@ -193,19 +193,21 @@ static void adjustStepStyle(int style) {
 
 // increment internal clock
 static void tick() {
-  long nt_millis=millis();
-  long dt_millis=nt_millis-t_millis;
+  long nt_millis = millis();
+  long dt_millis = nt_millis - t_millis;
 
-  t_millis=nt_millis;
+  t_millis = nt_millis;
 
-  dt=(float)dt_millis*0.001; // time since last tick, in seconds
-  t=(float)nt_millis*0.001;
+  dt = (float)dt_millis * 0.001; // time since last tick, in seconds
+  t = (float)nt_millis * 0.001;
 }
 
 // returns angle of dy/dx as a value from 0...2PI
-static float atan3(float dy,float dx) {
-  float a=atan2(dy,dx);
-  if(a<0) a=(PI*2.0)+a;
+static float atan3(float dy, float dx) {
+  float a = atan2(dy, dx);
+  if (a < 0) {
+    a = (PI * 2.0) + a;
+  }
   return a;
 }
 
@@ -221,9 +223,6 @@ static void setFeedRate(float v) {
   long step_delay1 = 1000000.0 / (feed_rate/THREADPERSTEP1);
   long step_delay2 = 1000000.0 / (feed_rate/THREADPERSTEP2);
   step_delay = step_delay1 > step_delay2 ? step_delay1 : step_delay2;
-
-  /* Serial.print(F("step_delay=")); */
-  /* Serial.println(step_delay); */
 }
 
 static void printFeedRate() {
@@ -461,10 +460,18 @@ static void printConfig() {
   Serial.println(PEN_DELAY);
 }
 
+static void applyMachineConfig(int step_style, float diameter1, float diameter2, float machine_width, float machine_height) {
+  adjustStepStyle(step_style); // this must be called BEFORE adjustSpoolDiameter
+  adjustSpoolDiameter(diameter1, diameter2);
+  adjustMachineLimits(machine_width, machine_height);
+  m1 = AFMS0.getStepper(STEPS_PER_TURN, M2_PIN);
+  m2 = AFMS0.getStepper(STEPS_PER_TURN, M1_PIN);
+}
+
 static void LoadConfigFromEEPROM() {
   char version_number = EEPROM.read(ADDR_VERSION);
   if (version_number != EEPROM_VERSION) {
-    EEPROM.write(ADDR_VERSION,EEPROM_VERSION);
+    EEPROM.write(ADDR_VERSION, EEPROM_VERSION);
     saveConfigToEEPROM();
   } else {
     unsigned int n = 0;
@@ -478,15 +485,12 @@ static void LoadConfigFromEEPROM() {
     n = EEPROM_readAnything(ADDR_MACHINE_WIDTH, _machinewidth);
     n = EEPROM_readAnything(ADDR_MACHINE_HEIGHT, _machineheight);
     n = EEPROM_readAnything(ADDR_STEP_STYLE, _step_style);
-    adjustStepStyle(_step_style); // this must be called BEFORE adjustSpoolDiameter
-    adjustSpoolDiameter(_diameter1, _diameter2);
-    adjustMachineLimits(_machinewidth, _machineheight);
-
     n = EEPROM_readAnything(ADDR_PAPER_WIDTH, PAPER_WIDTH);
     n = EEPROM_readAnything(ADDR_PAPER_HEIGHT, PAPER_HEIGHT);
     n = EEPROM_readAnything(ADDR_PEN_UP_ANGLE, PEN_UP_ANGLE);
     n = EEPROM_readAnything(ADDR_PEN_DOWN_ANGLE, PEN_DOWN_ANGLE);
     n = EEPROM_readAnything(ADDR_PEN_DELAY, PEN_DELAY);
+    applyMachineConfig(_step_style, _diameter1, _diameter2, _machinewidth, _machineheight);
   }
 }
 
@@ -508,29 +512,28 @@ static void saveConfigToEEPROM() {
 
 //------------------------------------------------------------------------------
 static int processSubcommand() {
-  int found=0;
-  char *ptr=buffer;
-  while(ptr && ptr<buffer+sofar && strlen(ptr)) {
-    if(!strncmp(ptr,"G20",3)) {
-      mode_scale=2.54f;  // inches -> cm
-      strcpy(mode_name,"in");
-      found=1;
-    } else if(!strncmp(ptr,"G21",3)) {
-      mode_scale=0.1;  // mm -> cm
-      strcpy(mode_name,"mm");
-      found=1;
-    } else if(!strncmp(ptr,"G90",3)) {
+  int found = 0;
+  char *ptr = buffer;
+  while (ptr && ptr < buffer + sofar && strlen(ptr)) {
+    if (!strncmp(ptr, "G20", 3)) {
+      mode_scale = 2.54f;  // inches -> cm
+      strcpy(mode_name, "in");
+      found = 1;
+    } else if (!strncmp(ptr, "G21", 3)) {
+      mode_scale = 0.1;  // mm -> cm
+      strcpy(mode_name, "mm");
+      found = 1;
+    } else if (!strncmp(ptr, "G90", 3)) {
       // absolute mode
-      absolute_mode=1;
-      found=1;
-    } else if(!strncmp(ptr,"G91",3)) {
+      absolute_mode = 1;
+      found = 1;
+    } else if (!strncmp(ptr, "G91", 3)) {
       // relative mode
-      absolute_mode=0;
-      found=1;
+      absolute_mode = 0;
+      found = 1;
     }
-    ptr=strchr(ptr,' ')+1;
+    ptr = strchr(ptr, ' ') + 1;
   }
-
   return found;
 }
 
@@ -578,51 +581,48 @@ static void processCommand() {
     int _pen_delay = PEN_DELAY;
 
     char *ptr=buffer;
-    while(ptr && ptr<buffer+sofar && strlen(ptr)) {
-      ptr=strchr(ptr,' ')+1;
-      switch(*ptr) {
-      case 'W': _machine_width = atof(ptr+1); break;
-      case 'H': _machine_height = atof(ptr+1); break;
-      case 'M': _m1d = *(ptr+1); break;
-      case 'N': _m2d = *(ptr+1); break;
-      case 'O': _paper_width = atof(ptr+1); break;
-      case 'P': _paper_height = atof(ptr+1); break;
-      case 'Q': amountL = atof(ptr+1); break;
-      case 'R': amountR = atof(ptr+1); break;
-      case 'S': _step_style = atoi(ptr+1); break;
-      case 'T': _pen_up_angle = atoi(ptr+1); break;
-      case 'U': _pen_down_angle = atoi(ptr+1); break;
-      case 'V': _pen_delay = atoi(ptr+1); break;
-      case 'I':
-        if(atoi(ptr+1)>0) {
-          M1_REEL_IN=FORWARD;
-          M1_REEL_OUT=BACKWARD;
-        } else {
-          M1_REEL_IN=BACKWARD;
-          M1_REEL_OUT=FORWARD;
+    while(ptr && ptr < buffer + sofar && strlen(ptr)) {
+      ptr = strchr(ptr, ' ') + 1;
+      switch (*ptr) {
+        case 'W': _machine_width = atof(ptr + 1); break;
+        case 'H': _machine_height = atof(ptr + 1); break;
+        case 'M': _m1d = *(ptr + 1); break;
+        case 'N': _m2d = *(ptr + 1); break;
+        case 'O': _paper_width = atof(ptr + 1); break;
+        case 'P': _paper_height = atof(ptr + 1); break;
+        case 'Q': amountL = atof(ptr + 1); break;
+        case 'R': amountR = atof(ptr + 1); break;
+        case 'S': _step_style = atoi(ptr + 1); break;
+        case 'T': _pen_up_angle = atoi(ptr + 1); break;
+        case 'U': _pen_down_angle = atoi(ptr + 1); break;
+        case 'V': _pen_delay = atoi(ptr + 1); break;
+        case 'I':
+          if (atoi(ptr + 1) > 0) {
+            M1_REEL_IN = FORWARD;
+            M1_REEL_OUT = BACKWARD;
+          } else {
+            M1_REEL_IN = BACKWARD;
+            M1_REEL_OUT = FORWARD;
+          }
+          break;
+        case 'J':
+          if (atoi(ptr + 1) > 0) {
+            M2_REEL_IN = FORWARD;
+            M2_REEL_OUT = BACKWARD;
+          } else {
+            M2_REEL_IN = BACKWARD;
+            M2_REEL_OUT = FORWARD;
+          }
+          break;
         }
-        break;
-      case 'J':
-        if(atoi(ptr+1)>0) {
-          M2_REEL_IN=FORWARD;
-          M2_REEL_OUT=BACKWARD;
-        } else {
-          M2_REEL_IN=BACKWARD;
-          M2_REEL_OUT=FORWARD;
-        }
-        break;
       }
-    }
 
     m1d=_m1d;
     m2d=_m2d;
 
     PAPER_WIDTH = _paper_width;
     PAPER_HEIGHT = _paper_height;
-    adjustMachineLimits(_machine_width, _machine_height);
-    adjustSpoolDiameter(amountL, amountR);
-
-    adjustStepStyle(_step_style);
+    applyMachineConfig(_step_style, amountL, amountR, _machine_width, _machine_height);
     PEN_UP_ANGLE = _pen_up_angle;
     PEN_DOWN_ANGLE = _pen_down_angle;
     PEN_DELAY = _pen_delay;
@@ -744,40 +744,31 @@ static void processCommand() {
 
 //------------------------------------------------------------------------------
 void setup() {
-  LoadConfigFromEEPROM();
 
-  // initialize the read buffer
-  sofar=0;
-  // start communications
-  Serial.begin(BAUD);
-  Serial.print(F("\n\nHELLO WORLD!"));
-
-  // start the shield
   AFMS0.begin();
-  m1 = AFMS0.getStepper(STEPS_PER_TURN, M2_PIN);
-  m2 = AFMS0.getStepper(STEPS_PER_TURN, M1_PIN);
 
   // initialize the scale
   strcpy(mode_name,"mm");
-  mode_scale=0.1;
+  mode_scale = 0.1;
 
-  setFeedRate(MAX_VEL*30/mode_scale);  // *30 because i also /2
+  LoadConfigFromEEPROM();
 
-  // servo should be on SER1, pin 10.
+  sofar = 0; // initialize the read buffer
+  Serial.begin(BAUD);
+  Serial.print(F("\n\nHELLO WORLD!"));
+
   s1.attach(SERVO_PIN);
 
   // turn on the pull up resistor
-  digitalWrite(L_PIN,HIGH);
-  digitalWrite(R_PIN,HIGH);
+  digitalWrite(L_PIN, HIGH);
+  digitalWrite(R_PIN, HIGH);
 
-  // display the help at startup.
   help();
 
-  // initialize the plotter position.
   teleport(0,0);
-  velx=0;
-  velx=0;
-  setPenAngle(PEN_UP_ANGLE);
+  velx = 0;
+  velx = 0;
+  // setPenAngle(PEN_UP_ANGLE);
 
   Serial.print(F("> "));
 }
@@ -788,24 +779,17 @@ void loop() {
   // See: http://www.marginallyclever.com/2011/10/controlling-your-arduino-through-the-serial-monitor/
   // listen for serial commands
   while(Serial.available() > 0) {
-    buffer[sofar++]=Serial.read();
-    if(buffer[sofar-1]==';') break;  // in case there are multiple instructions
+    buffer[sofar++] = Serial.read();
+    if(buffer[sofar - 1] == ';') break;  // in case there are multiple instructions
   }
 
   // if we hit a semi-colon, assume end of instruction.
-  if(sofar>0 && buffer[sofar-1]==';') {
-    buffer[sofar]=0;
-
+  if (sofar > 0 && buffer[sofar - 1] == ';') {
+    buffer[sofar] = 0;
     // echo confirmation
     // Serial.println(F(buffer));
-
-    // do something with the command
     processCommand();
-
-    // reset the buffer
-    sofar=0;
-
-    // echo completion
+    sofar = 0;
     Serial.print(F("> "));
   }
 }
