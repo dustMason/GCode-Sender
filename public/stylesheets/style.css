@@ -94,7 +94,7 @@ p {
 
 #controls select {
   display: inline-block;
-  width: 160px;
+  width: 130px;
 }
 label.tab {
   background: black;
@@ -114,6 +114,57 @@ label.tab {
   .controlConfig input[type="text"] {
     width: 30px;
   }
+  .controlConfig .penAngleBox > div,
+  .controlConfig .diameterBox > div,
+  .controlConfig .stepStyleBox > div {
+    display: inline-block;
+  }
+  .controlConfig .stepStyleBox select {
+    width: 50px;
+  }
+  .machineBox {
+    width: 130px;
+    height: 110px;
+    border: 1px solid #555;
+    background: rgba(255,255,255,0.5);
+    position: relative;
+    padding: 20px 30px;
+    float: left;
+    margin: 8px 50px 30px 0;
+  }
+    .machineBox .machine-width {
+      position: absolute;
+      top: -13px;
+      margin-left: -25px;
+      left: 50%;
+    }
+    .machineBox .machine-height {
+      position: absolute;
+      right: -25px;
+      margin-top: -10px;
+      top: 50%;
+    }
+
+  .paperBox {
+    border: 1px solid white;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: rgba(255,255,255,0.7);
+  }
+    .paperBox .paper-width {
+      position: absolute;
+      bottom: -13px;
+      margin-left: -25px;
+      left: 50%;
+    }
+    .paperBox .paper-height {
+      position: absolute;
+      left: -25px;
+      margin-top: -10px;
+      top: 50%;
+    }
+
 
 #controlFeed input[type=text] {
   width: 80px;
@@ -123,48 +174,6 @@ label.tab {
   width: 150px;
 }
 
-.machineBox {
-  width: 130px;
-  height: 110px;
-  border: 1px solid #555;
-  background: rgba(255,255,255,0.5);
-  position: relative;
-  padding: 20px 30px;
-  float: left;
-  margin: 8px 50px 0 0;
-}
-  .machineBox .machine-width {
-    position: absolute;
-    top: -13px;
-    margin-left: -25px;
-    left: 50%;
-  }
-  .machineBox .machine-height {
-    position: absolute;
-    right: -25px;
-    margin-top: -10px;
-    top: 50%;
-  }
-
-.paperBox {
-  border: 1px solid white;
-  position: relative;
-  width: 100%;
-  height: 100%;
-  background: rgba(255,255,255,0.7);
-}
-  .paperBox .paper-width {
-    position: absolute;
-    bottom: -13px;
-    margin-left: -25px;
-    left: 50%;
-  }
-  .paperBox .paper-height {
-    position: absolute;
-    left: -25px;
-    margin-top: -10px;
-    top: 50%;
-  }
 
 
 

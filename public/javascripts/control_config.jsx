@@ -10,7 +10,9 @@ var ControlConfig = React.createClass({
       leftSpoolDiameter: 0,
       rightSpoolDiameter: 0,
       penUpAngle: 0,
-      penDownAngle: 0
+      penDownAngle: 0,
+      penDelay: 0,
+      stepStyle: 0
     };
   },
   loadConfig: function(machineConfig) {
@@ -48,7 +50,7 @@ var ControlConfig = React.createClass({
           </div>
         </div>
 
-        <div class="diameterBox">
+        <div className="diameterBox">
           <p>Spool Diameters</p>
           <div>
             <label className="tab">L</label>
@@ -60,7 +62,7 @@ var ControlConfig = React.createClass({
           </div>
         </div>
 
-        <div class="penAngleBox">
+        <div className="penAngleBox">
           <p>Pen Angle</p>
           <div>
             <label className="tab">U</label>
@@ -69,6 +71,22 @@ var ControlConfig = React.createClass({
           <div>
             <label className="tab">D</label>
             <input type="text" name="penDownAngle" value={this.state.penDownAngle} onChange={this.handleChange} />
+          </div>
+          <div>
+            <label className="tab">Delay</label>
+            <input type="text" name="penDelay" value={this.state.penDelay} onChange={this.handleChange} />
+          </div>
+        </div>
+
+        <div className="stepStyleBox">
+          <p>Step Style</p>
+          <div>
+            <select id="stepStyle" name="stepStyle" value={this.state.stepStyle}>
+              <option value="1">Single</option>
+              <option value="2">Double</option>
+              <option value="3">Interleave</option>
+              <option value="4">Microstep</option>
+            </select>
           </div>
         </div>
 

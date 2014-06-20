@@ -1,15 +1,15 @@
 //------------------------------------------------------------------------------
 // Draw robot - Supports Adafruit motor shield v2
-// dan@marginallycelver.com 2013 OCT 08
+// Originally written by dan@marginallycelver.com 2013 OCT 08
+// Forked by dustMason (http://github.com/dustMason) 2014 MAY
 //------------------------------------------------------------------------------
 // Copyright at end of file.  Please see
+// https://github.com/dustMason/GCode-Sender and
 // http://www.github.com/MarginallyClever/Makelangelo for more information.
 
 //------------------------------------------------------------------------------
 // CONSTANTS
 //------------------------------------------------------------------------------
-// Comment out this line to silence most serial output.
-//#define VERBOSE         (1)
 
 // which motor is on which pin?
 #define M1_PIN          (2)
@@ -19,27 +19,7 @@
 #define L_PIN          (A3)
 #define R_PIN          (A5)
 
-// #define STEP_STYLE     (SINGLE)
-/* #define STEP_STYLE     (DOUBLE) */
-#define STEP_STYLE     (INTERLEAVE)
-// #define STEP_STYLE     (MICROSTEP)
-
-// NEMA17 are 200 steps (1.8 degrees) per turn.  If a spool is 0.8 diameter
-// then it is 2.5132741228718345 circumference, and
-// 2.5132741228718345 / 200 = 0.0125663706 thread moved each step.
-// NEMA17 are rated up to 3000RPM.  Adafruit can handle >1000RPM.
-// These numbers directly affect the maximum velocity.
-/* #define STEPS_PER_TURN  (200.0) */
-#define STEPS_PER_TURN  (400.0) // for interleave
-// #define STEPS_PER_TURN  (3200.0) // for microstep
 #define MAX_RPM         (3000.0)
-
-// switch sensitivity
-#define SWITCH_HALF     (512)
-
-
-#define MAX_STEPS_S     (STEPS_PER_TURN*MAX_RPM/60.0)  // steps/s
-
 #define MIN_VEL         (0.001) // cm/s
 
 // for arc directions
@@ -73,7 +53,7 @@
 #define ADDR_PEN_UP_ANGLE     28            // (int - 2 bytes)
 #define ADDR_PEN_DOWN_ANGLE   30            // (int - 2 bytes)
 #define ADDR_PEN_DELAY        32            // (int - 2 bytes)
-
+#define ADDR_STEP_STYLE       34            // (int - 2 bytes)
 
 //------------------------------------------------------------------------------
 // INCLUDES
@@ -86,12 +66,11 @@
 
 // Saving config
 #include <EEPROM.h>
-#include <Arduino.h>  // for type definitions
+#include <Arduino.h>
 #include "EEPROMAnything.h"
 
 // Robert Penner's easing algos via http://portfolio.tobiastoft.dk/Easing-library-for-Arduino
 #include <Easing.h>
-
 
 //------------------------------------------------------------------------------
 // VARIABLES
@@ -103,6 +82,12 @@ Adafruit_StepperMotor *m2;
 
 static Servo s1;
 
+static int STEP_STYLE = INTERLEAVE;
+// attention: these get set by adjustStepStyle below
+static int MAX_STEPS_S = 1;
+static float MAX_VEL = 1; // cm/s
+static int STEPS_PER_TURN = 1;
+
 // config values. used to calculate limits below
 static float MACHINE_WIDTH = 0;
 static float MACHINE_HEIGHT = 0;
@@ -110,9 +95,10 @@ static float PAPER_WIDTH = 0;
 static float PAPER_HEIGHT = 0;
 
 // servo angles for pen control
-static int PEN_UP_ANGLE = 170;
-static int PEN_DOWN_ANGLE = 10;  // Some steppers don't like 0 degrees
-static int PEN_DELAY = 250;  // in ms
+// attention: these are set by EEPROM config
+static int PEN_UP_ANGLE = 1;
+static int PEN_DOWN_ANGLE = 1; // Some steppers don't like 0 degrees
+static int PEN_DELAY = 1; // in ms (250 is good)
 
 // plotter limits
 // all distances are relative to the calibration point of the plotter.
@@ -133,13 +119,12 @@ int M2_REEL_IN  = BACKWARD;
 int M2_REEL_OUT = FORWARD;
 
 // calculate some numbers to help us find feed_rate
+// attention: these are set by adjustSpoolDiameter below
 float SPOOL_DIAMETER1 = 4.300;
-float THREADPERSTEP1 = 0.675; // thread per step
-
 float SPOOL_DIAMETER2 = 4.300;
-float THREADPERSTEP2 = 0.675; // thread per step
 
-float MAX_VEL = MAX_STEPS_S * THREADPERSTEP1; // cm/s
+float THREADPERSTEP1 = 0.675; // thread per step
+float THREADPERSTEP2 = 0.675; // thread per step
 
 // plotter position.
 static float posx, velx;
@@ -177,9 +162,6 @@ static void adjustSpoolDiameter(float diameter1,float diameter2) {
   float MAX_VEL1 = MAX_STEPS_S * THREADPERSTEP1; // cm/s
   float MAX_VEL2 = MAX_STEPS_S * THREADPERSTEP2; // cm/s
   MAX_VEL = MAX_VEL1 > MAX_VEL2 ? MAX_VEL1 : MAX_VEL2;
-
-  // Serial.print(F("SpoolDiameter1 = "); Serial.println(F(SPOOL_DIAMETER1,3));
-  // Serial.print(F("SpoolDiameter2 = "); Serial.println(F(SPOOL_DIAMETER2,3));
 }
 
 static void adjustMachineLimits(float machineWidth, float machineHeight) {
@@ -189,6 +171,24 @@ static void adjustMachineLimits(float machineWidth, float machineHeight) {
   limit_bottom = machineHeight / 2.0;
   limit_left = (machineWidth / 2.0) * -1;
   limit_right = machineWidth / 2.0;
+}
+
+static void adjustStepStyle(int style) {
+  STEP_STYLE = style;
+  // NEMA17 are 200 steps (1.8 degrees) per turn.  If a spool is 0.8 diameter
+  // then it is 2.5132741228718345 circumference, and
+  // 2.5132741228718345 / 200 = 0.0125663706 thread moved each step.
+  // NEMA17 are rated up to 3000RPM.  Adafruit can handle >1000RPM.
+  // These numbers directly affect the maximum velocity.
+  if (style == MICROSTEP) {
+    STEPS_PER_TURN = 3200.0;
+  } else if (style == INTERLEAVE) {
+    STEPS_PER_TURN = 400.0;
+  } else {
+    STEPS_PER_TURN = 200.0;
+  }
+  MAX_STEPS_S = STEPS_PER_TURN * MAX_RPM / 60.0; // steps/s
+  // MAX_VEL = MAX_STEPS_S * THREADPERSTEP1; // cm/s // gets set again by adjustSpoolDiameter anyway...
 }
 
 // increment internal clock
@@ -229,7 +229,7 @@ static void setFeedRate(float v) {
 static void printFeedRate() {
   Serial.print(F("RATE:"));
   Serial.print(F("f1="));
-  Serial.print(feed_rate*60.0/mode_scale);
+  Serial.print(feed_rate * 60.0 / mode_scale);
   Serial.print(mode_name);
   Serial.print(F("/min"));
 }
@@ -265,13 +265,6 @@ static void FK(float l1, float l2,float &x,float &y) {
   float a = l1 * THREADPERSTEP1;
   float b = (limit_right-limit_left);
   float c = l2 * THREADPERSTEP2;
-
-  // slow, uses trig
-  //float theta = acos((a*a+b*b-c*c)/(2.0*a*b));
-  //x = cos(theta)*l1 + limit_left;
-  //y = sin(theta)*l1 + limit_top;
-  // but we know that cos(acos(i)) = i
-  // and we know that sin(acos(i)) = sqrt(1-i*i)
   float i=(a*a+b*b-c*c)/(2.0*a*b);
   x = i * l1 + limit_left;
   y = sqrt(1.0 - i*i)*l1 + limit_top;
@@ -437,15 +430,8 @@ static void where() {
   Serial.print(posy);
   Serial.print(F(" Z"));
   Serial.print(posz);
-  /* Serial.print(F(" F")); */
-  /* printFeedRate(); */
   Serial.print(F("\n"));
 }
-
-// TODO add config for:
-// step type SINGLE, INTERLEAVE, ETC
-// pen up / down angles
-// pen delay
 
 static void printConfig() {
   Serial.print(F("CONFIG:"));
@@ -465,6 +451,14 @@ static void printConfig() {
   Serial.println(SPOOL_DIAMETER1);
   Serial.print(F("R="));
   Serial.println(SPOOL_DIAMETER2);
+  Serial.print(F("S="));
+  Serial.println(STEP_STYLE);
+  Serial.print(F("T="));
+  Serial.println(PEN_UP_ANGLE);
+  Serial.print(F("U="));
+  Serial.println(PEN_DOWN_ANGLE);
+  Serial.print(F("V="));
+  Serial.println(PEN_DELAY);
 }
 
 static void LoadConfigFromEEPROM() {
@@ -478,10 +472,13 @@ static void LoadConfigFromEEPROM() {
     float _diameter2;
     float _machinewidth;
     float _machineheight;
+    int _step_style;
     n = EEPROM_readAnything(ADDR_SPOOL_DIA1, _diameter1);
     n = EEPROM_readAnything(ADDR_SPOOL_DIA2, _diameter2);
     n = EEPROM_readAnything(ADDR_MACHINE_WIDTH, _machinewidth);
     n = EEPROM_readAnything(ADDR_MACHINE_HEIGHT, _machineheight);
+    n = EEPROM_readAnything(ADDR_STEP_STYLE, _step_style);
+    adjustStepStyle(_step_style); // this must be called BEFORE adjustSpoolDiameter
     adjustSpoolDiameter(_diameter1, _diameter2);
     adjustMachineLimits(_machinewidth, _machineheight);
 
@@ -505,6 +502,7 @@ static void saveConfigToEEPROM() {
   n = EEPROM_writeAnything(ADDR_PEN_UP_ANGLE, PEN_UP_ANGLE);
   n = EEPROM_writeAnything(ADDR_PEN_DOWN_ANGLE, PEN_DOWN_ANGLE);
   n = EEPROM_writeAnything(ADDR_PEN_DELAY, PEN_DELAY);
+  n = EEPROM_writeAnything(ADDR_STEP_STYLE, STEP_STYLE);
 }
 
 
@@ -516,12 +514,10 @@ static int processSubcommand() {
     if(!strncmp(ptr,"G20",3)) {
       mode_scale=2.54f;  // inches -> cm
       strcpy(mode_name,"in");
-      // printFeedRate();
       found=1;
     } else if(!strncmp(ptr,"G21",3)) {
       mode_scale=0.1;  // mm -> cm
       strcpy(mode_name,"mm");
-      // printFeedRate();
       found=1;
     } else if(!strncmp(ptr,"G90",3)) {
       // absolute mode
@@ -546,9 +542,6 @@ static void processCommand() {
 
   if(!strncmp(buffer,"HELP",4)) {
     help();
-  /* } else if(!strncmp(buffer,"UID",3)) { */
-  /*   robot_uid=atoi(strchr(buffer,' ')+1); */
-  /*   SaveUID(); */
   } else if(!strncmp(buffer,"TELEPORT",8)) {
     float xx=posx;
     float yy=posy;
@@ -571,10 +564,6 @@ static void processCommand() {
     m1->release();
     m2->release();
   } else if(!strncmp(buffer,"CONFIG",6)) {
-    /* float tt=limit_top; */
-    /* float bb=limit_bottom; */
-    /* float rr=limit_right; */
-    /* float ll=limit_left; */
     float _machine_width = MACHINE_WIDTH;
     float _machine_height = MACHINE_HEIGHT;
     float _paper_width = PAPER_WIDTH;
@@ -583,25 +572,27 @@ static void processCommand() {
     char _m2d = m2d;
     float amountL = SPOOL_DIAMETER1;
     float amountR = SPOOL_DIAMETER2;
+    int _step_style = STEP_STYLE;
+    int _pen_up_angle = PEN_UP_ANGLE;
+    int _pen_down_angle = PEN_DOWN_ANGLE;
+    int _pen_delay = PEN_DELAY;
 
     char *ptr=buffer;
     while(ptr && ptr<buffer+sofar && strlen(ptr)) {
       ptr=strchr(ptr,' ')+1;
       switch(*ptr) {
-      /* case 'T': tt=atof(ptr+1);  break; */
-      /* case 'B': bb=atof(ptr+1);  break; */
-      /* case 'R': rr=atof(ptr+1);  break; */
-      /* case 'L': ll=atof(ptr+1);  break; */
-      case 'W': _machine_width=atof(ptr+1); break;
-      case 'H': _machine_height=atof(ptr+1); break;
-      /* case 'G': gg=*(ptr+1); break; */
-      /* case 'H': hh=*(ptr+1); break; */
-      case 'M': _m1d=*(ptr+1); break;
-      case 'N': _m2d=*(ptr+1); break;
-      case 'O': _paper_width=atof(ptr+1); break;
-      case 'P': _paper_height=atof(ptr+1); break;
-      case 'Q': amountL=atof(ptr+1); break;
-      case 'R': amountR=atof(ptr+1); break;
+      case 'W': _machine_width = atof(ptr+1); break;
+      case 'H': _machine_height = atof(ptr+1); break;
+      case 'M': _m1d = *(ptr+1); break;
+      case 'N': _m2d = *(ptr+1); break;
+      case 'O': _paper_width = atof(ptr+1); break;
+      case 'P': _paper_height = atof(ptr+1); break;
+      case 'Q': amountL = atof(ptr+1); break;
+      case 'R': amountR = atof(ptr+1); break;
+      case 'S': _step_style = atoi(ptr+1); break;
+      case 'T': _pen_up_angle = atoi(ptr+1); break;
+      case 'U': _pen_down_angle = atoi(ptr+1); break;
+      case 'V': _pen_delay = atoi(ptr+1); break;
       case 'I':
         if(atoi(ptr+1)>0) {
           M1_REEL_IN=FORWARD;
@@ -623,18 +614,6 @@ static void processCommand() {
       }
     }
 
-    /* limit_top=tt; */
-    /* limit_bottom=bb; */
-    /* limit_right=rr; */
-    /* limit_left=ll; */
-    // calculate limits based on given width and height
-    // this assumes starting at center
-    /* MACHINE_HEIGHT = _machine_height; */
-    /* MACHINE_WIDTH = _machine_width; */
-    /* limit_top = (_machine_height / 2.0) * -1; */
-    /* limit_bottom = _machine_height / 2.0; */
-    /* limit_left = (_machine_width / 2.0) * -1; */
-    /* limit_right = _machine_width / 2.0; */
     m1d=_m1d;
     m2d=_m2d;
 
@@ -642,10 +621,15 @@ static void processCommand() {
     PAPER_HEIGHT = _paper_height;
     adjustMachineLimits(_machine_width, _machine_height);
     adjustSpoolDiameter(amountL, amountR);
+
+    adjustStepStyle(_step_style);
+    PEN_UP_ANGLE = _pen_up_angle;
+    PEN_DOWN_ANGLE = _pen_down_angle;
+    PEN_DELAY = _pen_delay;
+
     /* teleport(0,0); */
     saveConfigToEEPROM();
     printConfig();
-    // printFeedRate();
   } else if(!strncmp(buffer,"G00 ",4) || !strncmp(buffer,"G01 ",4)
          || !strncmp(buffer,"G0 " ,3) || !strncmp(buffer,"G1 " ,3) ) {
     // line
@@ -748,12 +732,6 @@ static void processCommand() {
       amount = abs(amount);
       for(i=0;i<amount;++i) {  m2->step(1,dir);  delay(2);  }
     }
-  /* } else if(!strncmp(buffer,"D02 ",4)) { */
-  /*   Serial.print(F("DIAMETER:")); */
-  /*   Serial.print(F("L=")); */
-  /*   Serial.print(SPOOL_DIAMETER1); */
-  /*   Serial.print(F(",R=")); */
-  /*   Serial.println(SPOOL_DIAMETER2); */
   } else {
     if(processSubcommand()==0) {
       Serial.print(F("Invalid command '"));
@@ -773,7 +751,6 @@ void setup() {
   // start communications
   Serial.begin(BAUD);
   Serial.print(F("\n\nHELLO WORLD!"));
-  /* Serial.println(robot_uid); */
 
   // start the shield
   AFMS0.begin();

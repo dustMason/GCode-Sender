@@ -117,6 +117,10 @@ Machine.prototype.saveConfig = function(machineConfig) {
     " P" + parseFloat(machineConfig.paperHeight).toFixed(3) +
     " Q" + parseFloat(machineConfig.leftSpoolDiameter).toFixed(3) +
     " R" + parseFloat(machineConfig.rightSpoolDiameter).toFixed(3) +
+    " S" + parseInt(machineConfig.stepStyle) +
+    " T" + parseInt(machineConfig.penUpAngle) +
+    " U" + parseInt(machineConfig.penDownAngle) +
+    " V" + parseInt(machineConfig.penDelay) +
     ";";
   this.pushCommand(commandString);
 };
@@ -169,6 +173,14 @@ Machine.prototype._loadConfig = function(configString, callback) {
       config.leftSpoolDiameter = value;
     } else if (line.indexOf("R") === 0) {
       config.rightSpoolDiameter = value;
+    } else if (line.indexOf("S") === 0) {
+      config.stepStyle = value;
+    } else if (line.indexOf("T") === 0) {
+      config.penUpAngle = value;
+    } else if (line.indexOf("U") === 0) {
+      config.penDownAngle = value;
+    } else if (line.indexOf("V") === 0) {
+      config.penDelay = value;
     }
   });
   this.machineConfig = config;
