@@ -7,6 +7,17 @@
 // https://github.com/dustMason/GCode-Sender and
 // http://www.github.com/MarginallyClever/Makelangelo for more information.
 
+// plan for inkshield integration:
+// accept new C param on G00 and G01 commands to signify rotation around
+// the Z axis. Z axis is ignored with inkshield (although possibly implemented
+// later somehow). when C param is parsed, interpret at same step that Z is
+// currently handled. calculate time needed for movement and use that to inform
+// pause time?
+
+// use M command range to turn on and off ink spraying functions of cart?
+// maybe better to use another command suffix to allow each coordinate its own
+// spray rate.
+
 //------------------------------------------------------------------------------
 // CONSTANTS
 //------------------------------------------------------------------------------
