@@ -83,6 +83,10 @@
 // Robert Penner's easing algos via http://portfolio.tobiastoft.dk/Easing-library-for-Arduino
 #include <Easing.h>
 
+// yes.
+#include <InkShield.h>
+InkShieldA0A3 MyInkShield(2);
+
 //------------------------------------------------------------------------------
 // VARIABLES
 //------------------------------------------------------------------------------
@@ -280,15 +284,15 @@ static void FK(float l1, float l2,float &x,float &y) {
   y = sqrt(1.0 - i*i)*l1 + limit_top;
 }
 
-static void line_safe(float x,float y,float z) {
+static void line_safe(float x, float y, float z, int spray_rate) {
   // split up long lines to make them straighter?
-  float dx=x-posx;
-  float dy=y-posy;
+  float dx = x - posx;
+  float dy = y - posy;
 
-  float len=sqrt(dx*dx+dy*dy);
+  float len = sqrt(dx*dx+dy*dy);
 
-  if(len<=CM_PER_SEGMENT) {
-    line(x,y,z,step_delay);
+  if (len <= CM_PER_SEGMENT) {
+    line(x, y, z, step_delay, spray_rate);
     return;
   }
 
@@ -313,9 +317,10 @@ static void line_safe(float x,float y,float z) {
     line((x-x0)*a+x0,
          (y-y0)*a+y0,
          (z-z0)*a+z0,
-         current_step_delay);
+         current_step_delay,
+         spray_rate);
   }
-  line(x,y,z,current_step_delay);
+  line(x, y, z, current_step_delay, spray_rate);
 }
 
 void pause(long ms) {
@@ -323,7 +328,20 @@ void pause(long ms) {
   delayMicroseconds(ms%1000);
 }
 
-static void line(float x,float y,float z,long delay_ms) {
+static void spray(int spray_rate) {
+  if (spray_rate > 0) {
+    int spray_pattern;
+    if (spray_rate == 1) {
+      int shift_amount = random(16);
+      spray_pattern = 0b0000000000000001 << shift_amount;
+    } else {
+      spray_pattern = 0b1111111111111111 << spray_rate;
+    }
+    MyInkShield.spray_ink(spray_pattern);
+  }
+}
+
+static void line(float x, float y, float z, long delay_ms, int spray_rate) {
   long l1,l2;
   IK(x,y,l1,l2);
   long d1 = l1 - laststep1;
@@ -347,6 +365,7 @@ static void line(float x,float y,float z,long delay_ms) {
         over-=ad1;
         m2->onestep(dir2,STEP_STYLE);
       }
+      spray(spray_rate);
       pause(delay_ms);
     }
   } else {
@@ -357,6 +376,7 @@ static void line(float x,float y,float z,long delay_ms) {
         over-=ad2;
         m1->onestep(dir1,STEP_STYLE);
       }
+      spray(spray_rate);
       pause(delay_ms);
     }
   }
@@ -409,10 +429,10 @@ static void arc(float cx,float cy,float x,float y,float z,float dir) {
     ny = cy + sin(angle3) * radius;
     nz = ( z - posz ) * scale + posz;
     // send it to the planner
-    line(nx,ny,nz,step_delay);
+    line(nx,ny,nz,step_delay,0);
   }
 
-  line(x,y,z,step_delay);
+  line(x,y,z,step_delay,0);
 }
 
 // instantly move the virtual plotter position
@@ -577,6 +597,8 @@ static void processCommand() {
     // disable motors
     m1->release();
     m2->release();
+
+
   } else if(!strncmp(buffer,"CONFIG",6)) {
     float _machine_width = MACHINE_WIDTH;
     float _machine_height = MACHINE_HEIGHT;
@@ -646,35 +668,38 @@ static void processCommand() {
     // line
     processSubcommand();
     float xx, yy, zz;
+    int spray_rate = 0;
 
-    if(absolute_mode==1) {
-      xx=posx;
-      yy=posy;
-      zz=posz;
+    if (absolute_mode == 1) {
+      xx = posx;
+      yy = posy;
+      zz = posz;
     } else {
-      xx=0;
-      yy=0;
-      zz=0;
+      xx = 0;
+      yy = 0;
+      zz = 0;
     }
 
-    char *ptr=buffer;
-    while(ptr && ptr<buffer+sofar && strlen(ptr)) {
-      ptr=strchr(ptr,' ')+1;
+    char *ptr = buffer;
+    while (ptr && ptr < buffer + sofar && strlen(ptr)) {
+      ptr = strchr(ptr, ' ') + 1;
       switch(*ptr) {
-      case 'X': xx=atof(ptr+1)*mode_scale;  break;
-      case 'Y': yy=atof(ptr+1)*mode_scale;  break;
-      case 'Z': zz=atof(ptr+1);  break;
-      case 'F': setFeedRate(atof(ptr+1));  break;
+        case 'X': xx = atof(ptr+1) * mode_scale; break;
+        case 'Y': yy = atof(ptr+1) * mode_scale; break;
+        case 'Z': zz = atof(ptr+1); break;
+        case 'R': spray_rate = atoi(ptr+1); break;
+        case 'F': setFeedRate(atof(ptr+1)); break;
       }
     }
 
-    if(absolute_mode==0) {
-      xx+=posx;
-      yy+=posy;
-      zz+=posz;
+    if (absolute_mode == 0) {
+      xx += posx;
+      yy += posy;
+      zz += posz;
     }
 
-    line_safe(xx,yy,zz);
+    line_safe(xx, yy, zz, spray_rate);
+
   } else if(!strncmp(buffer,"G02 ",4) || !strncmp(buffer,"G2 " ,3)
          || !strncmp(buffer,"G03 ",4) || !strncmp(buffer,"G3 " ,3)) {
     // arc

@@ -68,6 +68,7 @@ io.on('connection', function(socket) {
   socket.on("pauseDrawing", machine.pauseDrawing.bind(machine));
   socket.on("resumeDrawing", machine.resumeDrawing.bind(machine));
   socket.on("startDrawing", machine.startDrawing.bind(machine));
+  // socket.on("sprayInk", machine.sprayInk.bind(machine));
 
   socket.on('disconnect', function() {
     for (var eventName in _events) {

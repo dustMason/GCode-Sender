@@ -54,6 +54,11 @@ var ControlCommand = React.createClass({
         <button onClick={this.handleTopRightClick}>Top Right</button>
         <button onClick={this.handleBottomRightClick}>Bottom Right</button>
         <button onClick={this.handleBottomLeftClick}>Bottom Left</button>
+
+        <button onClick={this.handleClick} value="G91;G01 X10 Y0 R1;G90">Spray Left</button>
+        <button onClick={this.handleClick} value="G91;G01 X-10 Y0 R1;G90">Spray Right</button>
+        <button onClick={this.handleClick} value="G91;G01 X0 Y-10 R1;G90">Spray Up</button>
+        <button onClick={this.handleClick} value="G91;G01 X0 Y10 R1;G90">Spray Down</button>
       </div>
     );
   }
